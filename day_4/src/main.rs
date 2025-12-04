@@ -1,32 +1,6 @@
 use std::fs::File;
 use std::io::{Read, Result};
 
-fn get_nearby_wrap_checking(
-    index: usize,
-    length: usize,
-) -> (Option<usize>, Option<usize>, Option<usize>) {
-    let current_row = index / length;
-    let minus = if (index - 1) / length == current_row {
-        Some(index - 1)
-    } else {
-        None
-    };
-    let plus = if (index + 1) / length == current_row {
-        Some(index + 1)
-    } else {
-        None
-    };
-
-    return (minus, Some(index), plus);
-}
-
-fn count_accessible_part_1(vector: &Vec<u8>, length: usize) {
-    let mut count = 0;
-    for i in 0..vector.len() {
-        if vector[i] == 1 {}
-    }
-}
-
 fn convolve(thing: &Vec<u8>, thing_row_size: usize) -> Vec<u8> {
     let mut new_vec: Vec<u8> = thing.clone();
 
@@ -97,19 +71,19 @@ fn count_rolls(original_map: &Vec<u8>, convolved_map: &Vec<u8>) -> u32 {
     count
 }
 
-fn part_1(contents: &str) -> u32 {
+fn map_to_binary(contents: &str) -> (Vec<u8>, usize) {
     let roll: u8 = '@' as u8;
 
     let mut length_of_line = 0;
 
-    let mut thing: Vec<u8> = Vec::new();
+    let mut output: Vec<u8> = Vec::new();
 
     for line in contents.lines() {
         let line = line.trim();
         // line in bytes
         length_of_line = line.len();
 
-        thing.append(
+        output.append(
             &mut line
                 .as_bytes()
                 .iter()
@@ -117,6 +91,12 @@ fn part_1(contents: &str) -> u32 {
                 .collect(),
         );
     }
+
+    (output, length_of_line)
+}
+
+fn part_1(contents: &str) -> u32 {
+    let (thing, length_of_line) = map_to_binary(&contents);
 
     let convolution = convolve(&thing, length_of_line);
 
@@ -127,12 +107,46 @@ fn part_1(contents: &str) -> u32 {
     sum
 }
 
+fn remove_rolls(map: &mut Vec<u8>, convolution: &Vec<u8>) -> u32 {
+    let mut sum = 0;
+    for i in 0..map.len() {
+        if map[i] == 0 {
+            continue;
+        }
+        if (convolution[i] - 1) < 4 {
+            map[i] = 0;
+            sum += 1;
+        }
+    }
+    sum
+}
+
+fn part_2(contents: &str) -> u32 {
+    let (mut thing, length_of_line) = map_to_binary(&contents);
+    let mut sum = 0;
+    loop {
+        let convolution = convolve(&thing, length_of_line);
+
+        let removed_rolls = remove_rolls(&mut thing, &convolution);
+
+        if removed_rolls == 0 {
+            break;
+        } else {
+            sum += removed_rolls;
+        }
+    }
+    println!("Part 2 Solution {}", sum);
+    sum
+}
+
 fn main() -> Result<()> {
     let mut contents = String::new();
 
     let _ = File::read_to_string(&mut File::open("input.txt")?, &mut contents);
 
     part_1(&contents);
+
+    part_2(&contents);
 
     Ok(())
 }
@@ -147,5 +161,13 @@ mod tests {
 
         let calc = part_1(&contents);
         assert_eq!(calc, 13);
+    }
+
+    #[test]
+    fn test_example_2() {
+        let contents = "..@@.@@@@.\n@@@.@.@.@@\n@@@@@.@.@@\n@.@@@@..@.\n@@.@@@@.@@\n.@@@@@@@.@\n.@.@.@.@@@\n@.@@@.@@@@\n.@@@@@@@@.\n@.@.@@@.@.";
+
+        let calc = part_2(&contents);
+        assert_eq!(calc, 43);
     }
 }
