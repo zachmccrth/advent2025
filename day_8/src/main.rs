@@ -1,11 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeSet, HashMap, HashSet},
-    fs::File,
-    io::Read,
-    ops::Deref,
-    rc::Rc,
-};
+use std::{fs::File, io::Read};
 
 fn read_input() -> String {
     let mut input = String::new();
@@ -13,7 +6,7 @@ fn read_input() -> String {
     input
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct Edge {
     distance_squared: i64,
     smaller_index: usize,
@@ -21,7 +14,7 @@ struct Edge {
 }
 
 fn distance_squared(node1: (i64, i64, i64), node2: (i64, i64, i64)) -> i64 {
-    (node1.0 - node2.0) ^ 2 + (node1.1 - node2.1) ^ 2 + (node1.2 - node2.2) ^ 2
+    (node1.0 - node2.0).pow(2) + (node1.1 - node2.1).pow(2) + (node1.2 - node2.2).pow(2)
 }
 
 fn parse_node(string: &str) -> (i64, i64, i64) {
@@ -34,7 +27,75 @@ fn parse_node(string: &str) -> (i64, i64, i64) {
     )
 }
 
-fn part_1(input: &str) -> u64 {
+#[derive(Debug)]
+enum NodeType {
+    Node(usize),
+    Root(u64),
+}
+
+struct Node {
+    self_idx: usize,
+    nodetype: NodeType,
+}
+
+struct UnionFind {
+    arena: Vec<Node>,
+}
+
+impl UnionFind {
+    fn new(capacity: usize) -> Self {
+        let mut arena = Vec::new();
+        for i in 0..capacity {
+            arena.push(Node {
+                self_idx: i,
+                nodetype: NodeType::Root(1),
+            })
+        }
+        UnionFind { arena: arena }
+    }
+
+    fn node(self: &Self, query: usize) -> &Node {
+        &self.arena[query]
+    }
+
+    fn find(self: &Self, query: usize) -> usize {
+        let mut node = self.node(query);
+
+        loop {
+            match node.nodetype {
+                NodeType::Root(_) => {
+                    return node.self_idx;
+                }
+                NodeType::Node(parent_idx) => {
+                    node = self.node(parent_idx);
+                }
+            }
+        }
+    }
+
+    fn merge(self: &mut Self, node1: usize, node2: usize) {
+        let root1_idx = self.find(node1);
+        let root2_idx = self.find(node2);
+        match (
+            &self.arena[root1_idx].nodetype,
+            &self.arena[root2_idx].nodetype,
+        ) {
+            (NodeType::Root(size1), NodeType::Root(size2)) => {
+                self.arena[root1_idx] = Node {
+                    self_idx: root1_idx,
+                    nodetype: NodeType::Root(size1 + size2),
+                };
+                self.arena[root2_idx] = Node {
+                    self_idx: root2_idx,
+                    nodetype: NodeType::Node(root1_idx),
+                };
+            }
+            other => panic!("Should both be Roots! Found {:?}", other),
+        }
+    }
+}
+
+fn part_1(input: &str, connections: u32) -> u64 {
     let mut visited = Vec::new();
 
     let mut edges = Vec::new();
@@ -51,15 +112,38 @@ fn part_1(input: &str) -> u64 {
     }
 
     edges.sort();
-    edges.truncate(1000);
+    edges.truncate(connections as usize);
 
-    0
+    println!("Edges: {:?}", edges);
+
+    let mut union_find = UnionFind::new(visited.len());
+
+    for edge in edges {
+        if union_find.find(edge.smaller_index) != union_find.find(edge.larger_index) {
+            union_find.merge(edge.smaller_index, edge.larger_index);
+        }
+    }
+
+    let mut sizes = Vec::new();
+    for node in union_find.arena {
+        match node.nodetype {
+            NodeType::Root(size) => sizes.push(size),
+            _ => {}
+        }
+    }
+
+    sizes.sort();
+    sizes.reverse();
+
+    println!("Sizes: {:?}", sizes);
+    sizes.get(0).unwrap_or(&1) * sizes.get(1).unwrap_or(&1) * sizes.get(2).unwrap_or(&1)
 }
 
 fn main() {
     let input = read_input();
+    let connections = 1000;
 
-    let part_1_answer = part_1(&input);
+    let part_1_answer = part_1(&input, connections);
 
     println!("Part 1 Solution: {}", part_1_answer);
 }
@@ -72,6 +156,7 @@ mod tests {
     fn test_example_1() {
         let input = "162,817,812\n57,618,57\n906,360,560\n592,479,940\n352,342,300\n466,668,158\n542,29,236\n431,825,988\n739,650,466\n52,470,668\n216,146,977\n819,987,18\n117,168,530\n805,96,715\n346,949,466\n970,615,88\n941,993,340\n862,61,35\n984,92,344\n425,690,689";
 
-        assert_eq!(part_1(&input), 40);
+        let connections = 10;
+        assert_eq!(part_1(&input, connections), 40);
     }
 }
