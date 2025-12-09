@@ -68,6 +68,7 @@ impl OrderedPushSetPart2 {
         self.values.iter()
     }
 }
+
 fn part_1(input: &str) -> u32 {
     let mut input_iter = input.lines();
     // initialize tachyons based on first line
@@ -123,6 +124,7 @@ fn part_2(input: &str) -> u64 {
 
     current_tachyons_index.values.iter().map(|v| v.1).sum()
 }
+
 fn main() {
     let input = read_input();
 
