@@ -73,7 +73,7 @@ impl UnionFind {
         }
     }
 
-    fn merge(self: &mut Self, node1: usize, node2: usize) {
+    fn merge(self: &mut Self, node1: usize, node2: usize) -> &Node {
         let root1_idx = self.find(node1);
         let root2_idx = self.find(node2);
         match (
@@ -89,13 +89,15 @@ impl UnionFind {
                     self_idx: root2_idx,
                     nodetype: NodeType::Node(root1_idx),
                 };
+
+                return self.node(root1_idx); // returns new root
             }
             other => panic!("Should both be Roots! Found {:?}", other),
         }
     }
 }
 
-fn part_1(input: &str, connections: u32) -> u64 {
+fn extract_edges(input: &str) -> Vec<Edge> {
     let mut visited = Vec::new();
 
     let mut edges = Vec::new();
@@ -112,11 +114,15 @@ fn part_1(input: &str, connections: u32) -> u64 {
     }
 
     edges.sort();
+
+    edges
+}
+
+fn part_1(input: &str, connections: u32) -> u64 {
+    let mut edges = extract_edges(&input);
     edges.truncate(connections as usize);
 
-    println!("Edges: {:?}", edges);
-
-    let mut union_find = UnionFind::new(visited.len());
+    let mut union_find = UnionFind::new(input.lines().count());
 
     for edge in edges {
         if union_find.find(edge.smaller_index) != union_find.find(edge.larger_index) {
@@ -135,8 +141,60 @@ fn part_1(input: &str, connections: u32) -> u64 {
     sizes.sort();
     sizes.reverse();
 
-    println!("Sizes: {:?}", sizes);
     sizes.get(0).unwrap_or(&1) * sizes.get(1).unwrap_or(&1) * sizes.get(2).unwrap_or(&1)
+}
+
+fn part_2(input: &str) -> i64 {
+    let mut visited = Vec::new();
+
+    let mut edges = Vec::new();
+    for (new_index, line) in input.lines().enumerate() {
+        let new_node = parse_node(&line);
+        for (existing_index, existing_node) in visited.iter().enumerate() {
+            edges.push(Edge {
+                distance_squared: distance_squared(*existing_node, new_node),
+                smaller_index: existing_index,
+                larger_index: new_index,
+            })
+        }
+        visited.push(new_node);
+    }
+
+    edges.sort();
+
+    let num_nodes = input.lines().count();
+
+    let mut union_find = UnionFind::new(num_nodes);
+
+    let edges_iter = edges.iter();
+
+    let mut last_edge = &Edge {
+        distance_squared: 0,
+        smaller_index: 0,
+        larger_index: 0,
+    };
+
+    for edge in edges_iter {
+        if union_find.find(edge.smaller_index) != union_find.find(edge.larger_index) {
+            let new_root = union_find.merge(edge.smaller_index, edge.larger_index);
+            match new_root.nodetype {
+                NodeType::Root(size) => {
+                    if size as usize == num_nodes {
+                        last_edge = edge;
+                        break;
+                    }
+                }
+                NodeType::Node(_) => {
+                    panic!("Should be root!");
+                }
+            }
+        }
+    }
+
+    let node1 = visited.get(last_edge.smaller_index).unwrap();
+    let node2 = visited.get(last_edge.larger_index).unwrap();
+
+    node1.0 * node2.0
 }
 
 fn main() {
@@ -146,6 +204,10 @@ fn main() {
     let part_1_answer = part_1(&input, connections);
 
     println!("Part 1 Solution: {}", part_1_answer);
+
+    let part_2_answer = part_2(&input);
+
+    println!("Part 2 Solution: {}", part_2_answer);
 }
 
 #[cfg(test)]
