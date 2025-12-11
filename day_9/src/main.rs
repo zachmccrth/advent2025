@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::{self, fs::File, io::Read};
 
 fn read_input() -> String {
@@ -35,6 +36,28 @@ fn part_1(input: &str) -> u64 {
     }
 
     max_area as u64
+}
+
+fn check_edges(
+    points: ((i64, i64), (i64, i64)),
+    xedges: Vec<(i64, i64, i64)>,
+    yedges: Vec<(i64, i64, i64)>,
+) -> bool {
+    let (point1, point2) = points;
+
+    let x_range = min(point1.0, point2.0)..=max(point1.0, point2.0);
+
+    for xedge in xedges {}
+
+    let y_range = min(point1.1, point2.1)..=max(point1.1, point2.1);
+    true
+}
+
+// we loop again (why not?)
+fn part_2(input: &str) -> u64 {
+    let points = extract_tuples(&input);
+
+    0
 }
 
 fn main() {
