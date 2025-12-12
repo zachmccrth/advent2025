@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::collections::VecDeque;
 use std::fmt::write;
 use std::fs::File;
 use std::io::Read;
@@ -88,7 +89,7 @@ fn get_buttons(input_line: &str) -> Vec<Vec<usize>> {
     buttons
 }
 
-fn get_numeric(input_line: &str, delimiters: (char, char)) -> Vec<usize> {
+fn get_numeric(input_line: &str, delimiters: (char, char)) -> Vec<u32> {
     let mut output = Vec::new();
 
     let (first_index, last_index) = get_delimiters_index(input_line, delimiters);
@@ -133,11 +134,7 @@ fn xor_state(state: &Vec<bool>, button: &Vec<usize>) -> Vec<bool> {
 struct Problem {
     lights: Vec<bool>,
     buttons: Vec<Vec<usize>>,
-    batteries: Vec<usize>,
-}
-
-fn index_tuples(n: usize, max_len: usize) -> impl Iterator<Item = Vec<usize>> {
-    (1..=max_len).flat_map(move |k| std::iter::repeat(0..n).take(k).multi_cartesian_product())
+    batteries: Vec<u32>,
 }
 
 // We could do some complicated stuff here, or we could just brute force
@@ -150,7 +147,9 @@ fn solve_problem_1(problem: &Problem) -> u64 {
         batteries: _,
     } = problem;
 
-    let index_iterator = index_tuples(buttons.len(), lights.len());
+    let mut index_iterator = (0..buttons.len()).powerset();
+
+    index_iterator.next();
 
     let mut presses = 0;
     for route in index_iterator {
@@ -171,6 +170,52 @@ fn solve_problem_1(problem: &Problem) -> u64 {
     presses as u64
 }
 
+fn fast_route(buttons: Vec<Vec<usize>>, answer: Vec<u32>) -> u32 {
+    // if we assume that the minimum presses (the max num) is the solution, then we know that we
+    // can only use a subset of the buttons -> the ones that include the max
+    let max = answer.iter().max().unwrap();
+
+    let max_indexes: Vec<usize> = (0..answer.len()).filter(|i| &answer[*i] == max).collect();
+
+    let mut sorted_index = (0..answer.len()).sorted_by(|i, j| Ord::cmp(&answer[*i], &answer[*j]));
+
+    let max_index = sorted_index.next().unwrap();
+
+    let valid_buttons: Vec<Vec<usize>> = buttons
+        .clone()
+        .into_iter()
+        .filter(|button| button.contains(&max_index))
+        .collect();
+
+    0
+}
+
+fn solve_problem_2(problem: &Problem) -> u64 {
+    let mut presses = 0;
+    let Problem {
+        lights: _,
+        buttons,
+        batteries,
+    } = problem;
+
+    let min_len = batteries.iter().max();
+    let multisets_iterator = multisets(buttons.len(), min_len, 150);
+    for route in multisets_iterator {
+        let mut state = vec![0; batteries.len()];
+        let route_len = route.len();
+        for button_index in &route {
+            add_state(&mut state, &buttons[*button_index]);
+        }
+        println!("Applied {:?} and state is now {:?}", route, state);
+        if state.eq(batteries) {
+            presses = route_len;
+            break;
+        };
+    }
+
+    presses as u64
+}
+
 fn part_1(input: &str) -> u64 {
     let problems = parse(&input);
 
@@ -182,10 +227,25 @@ fn part_1(input: &str) -> u64 {
     sum
 }
 
+fn part_2(input: &str) -> u64 {
+    let problems = parse(&input);
+
+    let mut sum = 0;
+    for (i, problem) in problems.iter().enumerate() {
+        sum += solve_problem_2(&problem);
+
+        println!("Solved {}/{}", i, problems.len())
+    }
+
+    sum
+}
 fn main() {
     let input = read_input();
-    let part_1_answer = part_1(&input);
-    println!("Part 1 Solution {}", part_1_answer);
+    // let part_1_answer = part_1(&input);
+    // println!("Part 1 Solution {}", part_1_answer);
+
+    let part_2_answer = part_2(&input);
+    println!("Part 2 Solution {}", part_2_answer);
 }
 
 #[cfg(test)]
@@ -206,6 +266,21 @@ mod tests {
         assert_eq!(example_1_answer, 2);
         assert_eq!(example_2_answer, 3);
         assert_eq!(example_3_answer, 2);
+    }
+
+    #[test]
+    fn test_example_2() {
+        let example_1 = "[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}";
+        let example_2 = "[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}";
+        let example_3 = "[.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}";
+
+        let example_1_answer = part_2(example_1);
+        let example_2_answer = part_2(example_2);
+        let example_3_answer = part_2(example_3);
+
+        assert_eq!(example_1_answer, 10);
+        assert_eq!(example_2_answer, 12);
+        assert_eq!(example_3_answer, 11);
     }
 
     #[test]
