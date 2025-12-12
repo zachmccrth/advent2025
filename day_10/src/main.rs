@@ -1,3 +1,5 @@
+use itertools::Itertools;
+use std::fmt::write;
 use std::fs::File;
 use std::io::Read;
 
@@ -36,10 +38,54 @@ fn get_lights(input_line: &str) -> Vec<bool> {
             '.' => output.push(false),
             '#' => output.push(true),
             _ => panic!("exceeded bounds of bank {}", input_line),
-        }<
+        }
     }
 
     output
+}
+
+fn get_buttons(input_line: &str) -> Vec<Vec<usize>> {
+    let mut buttons = Vec::new();
+
+    let mut input_iter = input_line.chars();
+
+    loop {
+        let char = input_iter.next();
+
+        match char {
+            Some('(') => {
+                let mut num = String::new();
+                let mut button: Vec<usize> = Vec::new();
+                loop {
+                    let char_option = input_iter.next();
+                    match char_option {
+                        Some(',') => {
+                            button.push(num.parse().unwrap());
+                            num = String::new();
+                        }
+                        Some(' ') => {}
+                        Some(')') => {
+                            button.push(num.parse().unwrap());
+                            break;
+                        }
+                        Some(digit) => {
+                            num.push(digit);
+                        }
+                        None => {
+                            panic!("No matching ')' found in string {}", input_line)
+                        }
+                    }
+                }
+                buttons.push(button);
+            }
+            Some(_) => {}
+            None => {
+                break;
+            }
+        }
+    }
+
+    buttons
 }
 
 fn get_numeric(input_line: &str, delimiters: (char, char)) -> Vec<usize> {
@@ -61,7 +107,7 @@ fn parse(input: &str) -> Vec<Problem> {
 
     for line in input.lines() {
         let lights = get_lights(line);
-        let buttons = get_numeric(line, ('(', ')'));
+        let buttons = get_buttons(line);
         let batteries = get_numeric(line, ('{', '}'));
 
         output.push(Problem {
@@ -74,28 +120,66 @@ fn parse(input: &str) -> Vec<Problem> {
     output
 }
 
+fn xor_state(state: &Vec<bool>, button: &Vec<usize>) -> Vec<bool> {
+    let mut new_state = state.clone();
+
+    for index in button {
+        new_state[*index] = !new_state[*index];
+    }
+
+    new_state
+}
+
 struct Problem {
     lights: Vec<bool>,
-    buttons: Vec<usize>,
+    buttons: Vec<Vec<usize>>,
     batteries: Vec<usize>,
 }
 
-
-fn solve_problem_1(problem: &Problem) -> u32 {
-
-
-    0
+fn index_tuples(n: usize, max_len: usize) -> impl Iterator<Item = Vec<usize>> {
+    (1..=max_len).flat_map(move |k| std::iter::repeat(0..n).take(k).multi_cartesian_product())
 }
 
+// We could do some complicated stuff here, or we could just brute force
+// Also, going to just allow the same button to be pressed twice in a row,
+// even though it will be slightly slower (but faster to write!)
+fn solve_problem_1(problem: &Problem) -> u64 {
+    let Problem {
+        lights,
+        buttons,
+        batteries: _,
+    } = problem;
+
+    let index_iterator = index_tuples(buttons.len(), lights.len());
+
+    let mut presses = 0;
+    for route in index_iterator {
+        let mut state = vec![false; lights.len()];
+        let route_len = route.len();
+        for button_index in route {
+            state = xor_state(&state, &buttons[button_index]);
+            if state.eq(lights) {
+                break;
+            };
+        }
+        if state.eq(lights) {
+            presses = route_len;
+            break;
+        };
+    }
+
+    presses as u64
+}
 
 fn part_1(input: &str) -> u64 {
-
     let problems = parse(&input);
 
+    let mut sum = 0;
+    for problem in problems {
+        sum += solve_problem_1(&problem);
+    }
 
-
-
-    0
+    sum
 }
 
 fn main() {
@@ -109,6 +193,7 @@ mod tests {
 
     use super::*;
 
+    #[test]
     fn test_example_1() {
         let example_1 = "[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}";
         let example_2 = "[...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}";
@@ -125,10 +210,10 @@ mod tests {
 
     #[test]
     fn test_delimiters() {
-        let test_example = "(2,3)";
-        let answer = vec![2, 3];
+        let test_example = "(2,3) (4,3,2)";
+        let answer = vec![vec![2, 3], vec![4, 3, 2]];
 
-        assert_eq!(get_numeric(test_example, ('(', ')')), answer);
+        assert_eq!(get_buttons(test_example), answer);
 
         let test_example = "[..##..#]";
         let answer = vec![false, false, true, true, false, false, true];
