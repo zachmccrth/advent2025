@@ -1,5 +1,4 @@
-use std::char::UNICODE_VERSION;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::io::Read;
 
@@ -21,37 +20,150 @@ fn parse_nodes(input: &str) -> Vec<Node> {
         id_to_index.insert(id, i);
     }
 
+    id_to_index.insert("out", id_to_index.len());
+
     for (i, line) in input.lines().enumerate() {
         let (id, nodes) = line.split_once(':').unwrap();
 
         let mut connections = Vec::new();
 
         for node in nodes.trim().split_whitespace() {
-            connections.push(*id_to_index.get(node).unwrap());
+            connections.push(
+                *id_to_index
+                    .get(node)
+                    .expect(&format!("String should have contained a node {}", node)),
+            );
         }
 
         output.push(Node {
             id: String::from(id),
             self_idx: i,
-            connections: connections,
+            connections_index: connections,
         })
     }
+
+    output.push(Node {
+        id: String::from("out"),
+        self_idx: output.len(),
+        connections_index: Vec::new(),
+    });
+
     output
 }
 
 struct Node {
     id: String,
     self_idx: usize,
-    connections: Vec<usize>,
+    connections_index: Vec<usize>,
 }
 
-fn part_1(nodes: Vec<Node>) {}
+impl Node {
+    fn is_out(self: &Self) -> bool {
+        self.id == "out"
+    }
+}
 
+struct NodeGraph {
+    nodes: Vec<Node>,
+}
+
+impl NodeGraph {
+    fn get_start(self: &Self) -> &Node {
+        self.nodes.iter().find(|node| node.id == "you").unwrap()
+    }
+
+    fn get_node(self: &Self, index: usize) -> &Node {
+        &self.nodes[index]
+    }
+}
+
+fn part_1(input: &str) -> u32 {
+    let nodes = parse_nodes(input);
+    let graph = NodeGraph { nodes: nodes };
+
+    let start_node = graph.get_start();
+
+    let mut to_visit = VecDeque::new();
+
+    to_visit.push_back(start_node);
+
+    let mut paths = 0;
+    loop {
+        let current_node = to_visit.pop_front();
+
+        match current_node {
+            Some(node) => {
+                if node.is_out() {
+                    paths += 1;
+                } else {
+                    // Push all of the connecting nodes in the current node
+                    node.connections_index
+                        .iter()
+                        .map(|index| graph.get_node(*index))
+                        .for_each(|node| to_visit.push_back(node));
+                }
+            }
+            None => {
+                break;
+            }
+        }
+    }
+
+    paths
+}
+
+fn part_2(input: &str) -> u32 {
+    let nodes = parse_nodes(input);
+    let graph = NodeGraph { nodes: nodes };
+
+    let start_node = graph.nodes.iter().find(|node| node.id == "svr").unwrap();
+
+    let mut to_visit = VecDeque::new();
+
+    // just going to wrap in a tuple now (fft, dac)
+    to_visit.push_back((start_node, false, false));
+
+    let mut paths = 0;
+    loop {
+        let current_node = to_visit.pop_front();
+
+        match current_node {
+            Some((node, fft, dac)) => {
+                if node.is_out() {
+                    if fft & dac {
+                        paths += 1;
+                    }
+                } else {
+                    // Push all of the connecting nodes in the current node
+                    for node in node
+                        .connections_index
+                        .iter()
+                        .map(|index| graph.get_node(*index))
+                    {
+                        to_visit.push_back((
+                            node,
+                            (node.id == "fft") | fft,
+                            (node.id == "dac") | dac,
+                        ));
+                    }
+                }
+            }
+            None => {
+                break;
+            }
+        }
+    }
+
+    paths
+}
 fn main() {
     let input = read_input();
-    let nodes = parse_nodes(&input);
 
-    println!("Hello, world!");
+    let part_1_answer = part_1(&input);
+    println!("Part 1: {}", part_1_answer);
+
+    let part_2_answer = part_2(&input);
+    println!("Part 2: {}", part_2_answer);
 }
 
 #[cfg(test)]
@@ -61,5 +173,15 @@ mod tests {
     #[test]
     fn test_example_1() {
         let input = "aaa: you hhh\nyou: bbb ccc\nbbb: ddd eee\nccc: ddd eee fff\nddd: ggg\neee: out\nfff: out\nggg: out\nhhh: ccc fff iii\niii: out\n";
+
+        let part_1_answer = part_1(&input);
+
+        assert_eq!(part_1_answer, 5);
+
+        let input = "svr: aaa bbb\naaa: fft\nfft: ccc\nbbb: tty\ntty: ccc\nccc: ddd eee\nddd: hub\nhub: fff\neee: dac\ndac: fff\nfff: ggg hhh\nggg: out\nhhh: out\n";
+
+        let part_2_answer = part_2(&input);
+
+        assert_eq!(part_2_answer, 2);
     }
 }
