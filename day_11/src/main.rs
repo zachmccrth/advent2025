@@ -112,6 +112,45 @@ fn part_1(input: &str) -> u32 {
     paths
 }
 
+fn modified_part_1(input: &str, start_id: &str, end_id: Vec<&str>) -> Vec<u32> {
+    let nodes = parse_nodes(input);
+    let graph = NodeGraph { nodes: nodes };
+
+    let start_node = graph.nodes.iter().find(|node| node.id == start_id).unwrap();
+
+    let mut to_visit = VecDeque::new();
+
+    to_visit.push_back(start_node);
+
+    let mut paths = vec![0; end_id.len()];
+
+    loop {
+        let current_node = to_visit.pop_front();
+
+        match current_node {
+            Some(node) => {
+                if end_id.contains(&node.id.as_str()) {
+                    let index = (0..end_id.len())
+                        .find(|i| end_id[*i] == node.id.as_str())
+                        .unwrap();
+                    paths[index] += 1;
+                } else {
+                    // Push all of the connecting nodes in the current node
+                    node.connections_index
+                        .iter()
+                        .map(|index| graph.get_node(*index))
+                        .for_each(|node| to_visit.push_back(node));
+                }
+            }
+            None => {
+                break;
+            }
+        }
+    }
+
+    paths
+}
+
 fn part_2(input: &str) -> u32 {
     let nodes = parse_nodes(input);
     let graph = NodeGraph { nodes: nodes };
@@ -121,6 +160,17 @@ fn part_2(input: &str) -> u32 {
     let mut to_visit = VecDeque::new();
 
     // just going to wrap in a tuple now (fft, dac)
+    // jk we are going to need to prune this better
+    //
+    // we consider three types of paths from srv -> end in fft, end in dac, end in out
+    //
+    // then from fft we consider dac and out
+    // and from dac we consider fft and out
+    //
+    // technically we can only have one of the three types, because if fft -> dac and dac -> fft
+    // that is a loop and the number of paths is infinite
+    //
+    // so which comes first? and then we can simplify
     to_visit.push_back((start_node, false, false));
 
     let mut paths = 0;
@@ -135,13 +185,13 @@ fn part_2(input: &str) -> u32 {
                     }
                 } else {
                     // Push all of the connecting nodes in the current node
-                    for node in node
+                    for new_node in node
                         .connections_index
                         .iter()
                         .map(|index| graph.get_node(*index))
                     {
                         to_visit.push_back((
-                            node,
+                            new_node,
                             (node.id == "fft") | fft,
                             (node.id == "dac") | dac,
                         ));
@@ -162,8 +212,11 @@ fn main() {
     let part_1_answer = part_1(&input);
     println!("Part 1: {}", part_1_answer);
 
-    let part_2_answer = part_2(&input);
-    println!("Part 2: {}", part_2_answer);
+    let mod_part = modified_part_1(&input, "svr", vec!["dac", "fft", "out"]);
+
+    println!("Soltuion: {:?}", mod_part);
+    // let part_2_answer = part_2(&input);
+    // println!("Part 2: {}", part_2_answer);
 }
 
 #[cfg(test)]
