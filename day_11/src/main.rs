@@ -386,8 +386,8 @@ impl Tree {
             match to_visit.pop() {
                 Some(node) => {
                     nodes_to_remove.push(node.self_idx);
-                    for child_idx in node.children {
-                        to_visit.push(self.get_node(child_idx));
+                    for child_idx in &node.children {
+                        to_visit.push(self.get_node(*child_idx));
                     }
                 }
                 None => {
@@ -398,19 +398,49 @@ impl Tree {
 
         let nodes_removed = nodes_to_remove.len();
 
-        for node_idx in nodes_to_remove {
-            self.nodes.rem
-        }
+        nodes_removed as u64
     }
 }
 
+// struct CallStack<'a> {
+//     node_idx: Vec<usize>,
+//     graph: &'a NodeGraph,
+// }
+//
+// impl<'a> CallStack<'a> {
+//     fn push_node(self: &mut Self, node: &Node) {
+//         self.node_idx.push(node.self_idx);
+//     }
+//
+//     fn reset_node(self: &mut Self, node_id)
+// }
+
 fn part_2_memoizied(input: &str) -> u64 {
+    // if you build it, he will come?
     let nodes = parse_nodes(input);
     let graph = NodeGraph { nodes: nodes };
 
     let start_node = graph.nodes.iter().find(|node| node.id == "svr").unwrap();
 
-    let fully_explored: HashMap<&str, u64> = HashMap::new();
+    // algo in pseudo code (because I don't know what structure I need yet)
+    //
+    // basically, go through every node in dfs. if I detect a cycle (node goes back on itself, I
+    // can reset to the start of the cycle, as every node on that cycle has an infinite number of
+    // paths) and this node is stored as 0 (as well as every other node on the call stack)
+    //
+    // If I finish (get to out) then I need to check if fft and dac are on my call stack. If they
+    // are, then I know that the previous node in the call stack has at least one path. Once I
+    // finish out a node (visit all of its children), then I can store the number of paths it has
+    // to out... This then essentially becomes a new out with a number attached to it (the number
+    // of paths). So we know that essentially we create a type of node that has a value attached to
+    // it (the number of paths that reaching that node adds to the total)
+    //
+    // Additionally, there are nodes that have a certain number of paths that go through dac/fft,
+    // and some paths that don't. So really I have 4 values (paths throught fft, paths through dac,
+    // paths through both, paths through out.) All stored paths should have paths through out tho.
+    // If fft is in the downstream path, it may not be in the upstream path. Same for dac.
+    // Actually, this won't matter though. We just wait for 'dac' to collect all of its downstream
+    // nodes, then for 'fft' .
 
     0
 }
