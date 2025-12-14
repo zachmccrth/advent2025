@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::io::Read;
 
@@ -226,7 +226,6 @@ fn part_2(input: &str) -> u32 {
     paths
 }
 
-
 // I am now guessing he sneakily slapped a cycle in here. Will need to find a way to detect
 // (switch to DFS, backtracking...)
 fn part_2_cycle_detection(input: &str) -> u32 {
@@ -333,8 +332,88 @@ fn part_2_cycle_detection(input: &str) -> u32 {
     paths
 }
 
+#[derive(Clone, Debug)]
+struct TreeNode {
+    id: String,
+    parent: usize,
+    self_idx: usize,
+    children: Vec<usize>,
+}
 
-fn part_2
+#[derive(Clone, Debug)]
+struct Tree {
+    root: usize,
+    nodes: Vec<TreeNode>,
+    node_id_hashmap: HashMap<String, usize>,
+}
+
+impl Tree {
+    fn get_root(self: &Self) -> &TreeNode {
+        &self.nodes[self.root]
+    }
+
+    fn get_node(self: &Self, node_index: usize) -> &TreeNode {
+        &self.nodes[node_index]
+    }
+
+    fn get_node_from_id(self: &Self, node_id: &str) -> &TreeNode {
+        &self.nodes[self.node_id_hashmap[node_id]]
+    }
+
+    fn add_node(self: &mut Self, parent_id: &str, new_node_id: &str) {
+        let parent_node_idx = self.node_id_hashmap[parent_id];
+        let new_node = TreeNode {
+            id: String::from(new_node_id),
+            parent: parent_node_idx,
+            self_idx: self.nodes.len(),
+            children: Vec::new(),
+        };
+        let parent_node = &mut self.nodes[parent_node_idx];
+        parent_node.children.push(new_node.self_idx);
+        self.nodes.push(new_node);
+    }
+
+    fn prune(self: &mut Self, node_to_prune_idx: usize) -> u64 {
+        let mut nodes_to_remove = Vec::new();
+
+        let node_to_prune = self.get_node(node_to_prune_idx);
+
+        let mut to_visit = Vec::new();
+
+        to_visit.push(node_to_prune);
+
+        loop {
+            match to_visit.pop() {
+                Some(node) => {
+                    nodes_to_remove.push(node.self_idx);
+                    for child_idx in node.children {
+                        to_visit.push(self.get_node(child_idx));
+                    }
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        let nodes_removed = nodes_to_remove.len();
+
+        for node_idx in nodes_to_remove {
+            self.nodes.rem
+        }
+    }
+}
+
+fn part_2_memoizied(input: &str) -> u64 {
+    let nodes = parse_nodes(input);
+    let graph = NodeGraph { nodes: nodes };
+
+    let start_node = graph.nodes.iter().find(|node| node.id == "svr").unwrap();
+
+    let fully_explored: HashMap<&str, u64> = HashMap::new();
+
+    0
+}
 
 fn main() {
     let input = read_input();
