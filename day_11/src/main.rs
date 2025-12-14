@@ -69,12 +69,12 @@ struct NodeGraph {
 }
 
 impl NodeGraph {
-    fn get_start(self: &Self) -> &Node {
-        self.nodes.iter().find(|node| node.id == "you").unwrap()
-    }
-
     fn get_node(self: &Self, index: usize) -> &Node {
         &self.nodes[index]
+    }
+
+    fn get_node_from_id(self: &Self, id: &str) -> &Node {
+        self.nodes.iter().find(|node| node.id == id).unwrap()
     }
 }
 
@@ -82,7 +82,7 @@ fn part_1(input: &str) -> u32 {
     let nodes = parse_nodes(input);
     let graph = NodeGraph { nodes: nodes };
 
-    let start_node = graph.get_start();
+    let start_node = graph.get_node_from_id("you");
 
     let mut to_visit = VecDeque::new();
 
@@ -114,7 +114,7 @@ fn part_1(input: &str) -> u32 {
 }
 
 fn modified_part_1(graph: &NodeGraph, start_id: &str, end_id: Vec<&str>) -> Vec<u32> {
-    let start_node = graph.nodes.iter().find(|node| node.id == start_id).unwrap();
+    let start_node = graph.get_node_from_id(start_id);
 
     let mut to_visit = VecDeque::new();
 
@@ -168,62 +168,6 @@ fn reverse_graph(old_graph: &NodeGraph) -> NodeGraph {
     }
 
     NodeGraph { nodes: new_nodes }
-}
-
-fn part_2(input: &str) -> u32 {
-    let nodes = parse_nodes(input);
-    let graph = NodeGraph { nodes: nodes };
-
-    let start_node = graph.nodes.iter().find(|node| node.id == "svr").unwrap();
-
-    let mut to_visit = VecDeque::new();
-
-    // just going to wrap in a tuple now (fft, dac)
-    // jk we are going to need to prune this better
-    //
-    // we consider three types of paths from srv -> end in fft, end in dac, end in out
-    //
-    // then from fft we consider dac and out
-    // and from dac we consider fft and out
-    //
-    // technically we can only have one of the three types, because if fft -> dac and dac -> fft
-    // that is a loop and the number of paths is infinite
-    //
-    // so which comes first? and then we can simplify
-    to_visit.push_back((start_node, false, false));
-
-    let mut paths = 0;
-    loop {
-        let current_node = to_visit.pop_front();
-
-        match current_node {
-            Some((node, fft, dac)) => {
-                if node.is_out() {
-                    if fft & dac {
-                        paths += 1;
-                    }
-                } else {
-                    // Push all of the connecting nodes in the current node
-                    for new_node in node
-                        .connections_index
-                        .iter()
-                        .map(|index| graph.get_node(*index))
-                    {
-                        to_visit.push_back((
-                            new_node,
-                            (node.id == "fft") | fft,
-                            (node.id == "dac") | dac,
-                        ));
-                    }
-                }
-            }
-            None => {
-                break;
-            }
-        }
-    }
-
-    paths
 }
 
 // I am now guessing he sneakily slapped a cycle in here. Will need to find a way to detect
@@ -332,117 +276,115 @@ fn part_2_cycle_detection(input: &str) -> u32 {
     paths
 }
 
-#[derive(Clone, Debug)]
-struct TreeNode {
-    id: String,
-    parent: usize,
-    self_idx: usize,
-    children: Vec<usize>,
-}
-
-#[derive(Clone, Debug)]
-struct Tree {
-    root: usize,
-    nodes: Vec<TreeNode>,
-    node_id_hashmap: HashMap<String, usize>,
-}
-
-impl Tree {
-    fn get_root(self: &Self) -> &TreeNode {
-        &self.nodes[self.root]
-    }
-
-    fn get_node(self: &Self, node_index: usize) -> &TreeNode {
-        &self.nodes[node_index]
-    }
-
-    fn get_node_from_id(self: &Self, node_id: &str) -> &TreeNode {
-        &self.nodes[self.node_id_hashmap[node_id]]
-    }
-
-    fn add_node(self: &mut Self, parent_id: &str, new_node_id: &str) {
-        let parent_node_idx = self.node_id_hashmap[parent_id];
-        let new_node = TreeNode {
-            id: String::from(new_node_id),
-            parent: parent_node_idx,
-            self_idx: self.nodes.len(),
-            children: Vec::new(),
-        };
-        let parent_node = &mut self.nodes[parent_node_idx];
-        parent_node.children.push(new_node.self_idx);
-        self.nodes.push(new_node);
-    }
-
-    fn prune(self: &mut Self, node_to_prune_idx: usize) -> u64 {
-        let mut nodes_to_remove = Vec::new();
-
-        let node_to_prune = self.get_node(node_to_prune_idx);
-
-        let mut to_visit = Vec::new();
-
-        to_visit.push(node_to_prune);
-
-        loop {
-            match to_visit.pop() {
-                Some(node) => {
-                    nodes_to_remove.push(node.self_idx);
-                    for child_idx in &node.children {
-                        to_visit.push(self.get_node(*child_idx));
-                    }
-                }
-                None => {
-                    break;
-                }
-            }
-        }
-
-        let nodes_removed = nodes_to_remove.len();
-
-        nodes_removed as u64
-    }
-}
-
-// struct CallStack<'a> {
-//     node_idx: Vec<usize>,
-//     graph: &'a NodeGraph,
-// }
+// algo in pseudo code (because I don't know what structure I need yet)
 //
-// impl<'a> CallStack<'a> {
-//     fn push_node(self: &mut Self, node: &Node) {
-//         self.node_idx.push(node.self_idx);
-//     }
+// basically, go through every node in dfs. if I detect a cycle (node goes back on itself, I
+// can reset to the start of the cycle, as every node on that cycle has an infinite number of
+// paths) and this node is stored as 0 (as well as every other node on the call stack)
 //
-//     fn reset_node(self: &mut Self, node_id)
-// }
+// If I finish (get to out) then I need to check if fft and dac are on my call stack. If they
+// are, then I know that the previous node in the call stack has at least one path. Once I
+// finish out a node (visit all of its children), then I can store the number of paths it has
+// to out... This then essentially becomes a new out with a number attached to it (the number
+// of paths). So we know that essentially we create a type of node that has a value attached to
+// it (the number of paths that reaching that node adds to the total)
+//
+// Additionally, there are nodes that have a certain number of paths that go through dac/fft,
+// and some paths that don't. So really I have 4 values (paths throught fft, paths through dac,
+// paths through both, paths through out.) All stored paths should have paths through out tho.
+// If fft is in the downstream path, it may not be in the upstream path. Same for dac.
+// Actually, this won't matter though. We just wait for 'dac' to collect all of its downstream
+// nodes, then for 'fft' .
+//
+// So I need a structure that will make it clear when I have visited all downstream nodes, I
+// could insert what is essentially a hook (clean up in the stack). That way I know that I have
+// visited all of the nodes. Is probably the simplest way of doing it.
+
+enum NodeOrCalling {
+    VisitNode(usize),
+    CallFinished(usize),
+}
 
 fn part_2_memoizied(input: &str) -> u64 {
     // if you build it, he will come?
+    use self::NodeOrCalling::*;
     let nodes = parse_nodes(input);
     let graph = NodeGraph { nodes: nodes };
 
-    let start_node = graph.nodes.iter().find(|node| node.id == "svr").unwrap();
+    let start_node = graph.get_node_from_id("svr");
 
-    // algo in pseudo code (because I don't know what structure I need yet)
-    //
-    // basically, go through every node in dfs. if I detect a cycle (node goes back on itself, I
-    // can reset to the start of the cycle, as every node on that cycle has an infinite number of
-    // paths) and this node is stored as 0 (as well as every other node on the call stack)
-    //
-    // If I finish (get to out) then I need to check if fft and dac are on my call stack. If they
-    // are, then I know that the previous node in the call stack has at least one path. Once I
-    // finish out a node (visit all of its children), then I can store the number of paths it has
-    // to out... This then essentially becomes a new out with a number attached to it (the number
-    // of paths). So we know that essentially we create a type of node that has a value attached to
-    // it (the number of paths that reaching that node adds to the total)
-    //
-    // Additionally, there are nodes that have a certain number of paths that go through dac/fft,
-    // and some paths that don't. So really I have 4 values (paths throught fft, paths through dac,
-    // paths through both, paths through out.) All stored paths should have paths through out tho.
-    // If fft is in the downstream path, it may not be in the upstream path. Same for dac.
-    // Actually, this won't matter though. We just wait for 'dac' to collect all of its downstream
-    // nodes, then for 'fft' .
+    let mut stack = Vec::new();
+    stack.push(NodeOrCalling::VisitNode(start_node.self_idx));
 
-    0
+    let mut seen_fft = false;
+    let mut seen_dac = false;
+
+    let mut fully_visited_nodes = vec![-2; graph.nodes.len()];
+
+    fully_visited_nodes[graph.get_node_from_id("out").self_idx] = 1;
+
+    let mut paths: u64 = 0;
+    while let Some(node_or_call) = stack.pop() {
+        match node_or_call {
+            VisitNode(node_idx) => {
+                if fully_visited_nodes[node_idx] == -2 {
+                    // we haven't seen this node yet, so add it to the stack as a call and all its
+                    // child nodes as subsequent call (will visit them before we get back here)
+
+                    // Add node call to stack,
+                    stack.push(CallFinished(node_idx));
+                    fully_visited_nodes[node_idx] = -1;
+
+                    // and now its connections:
+                    let node = &graph.get_node(node_idx);
+                    if node.id == "fft" {
+                        seen_fft = true;
+                    } else if node.id == "dac" {
+                        seen_dac = true;
+                    }
+
+                    for connection_idx in &node.connections_index {
+                        stack.push(VisitNode(*connection_idx));
+                    }
+                } else if fully_visited_nodes[node_idx] == -1 {
+                    // we have seen this node before (added it to the stack) so we assume a loop
+                    // unwind the stack, marking all nodes in the loop as terminators:
+                    loop {
+                        let node_or_call = stack.pop().unwrap();
+
+                        match node_or_call {
+                            // node is off of a loop, so don't ever visit
+                            VisitNode(to_remove_idx) => {
+                                fully_visited_nodes[to_remove_idx] = 0;
+                            }
+                            CallFinished(to_remove_idx) => {
+                                fully_visited_nodes[to_remove_idx] = 0;
+                                if to_remove_idx == node_idx {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // this is a terminator node (we don't keep exploring, already have the answer
+                    // in 'fully visited')
+                }
+            }
+            CallFinished(calling_node_idx) => {
+                // once we finish all of the children of this node add the child paths to the
+                // current node
+
+                let current_node = graph.get_node(calling_node_idx);
+
+                for child_node_idx in &current_node.connections_index {
+                    fully_visited_nodes[current_node.self_idx] =
+                        fully_visited_nodes[*child_node_idx];
+                }
+            }
+        }
+    }
+
+    paths
 }
 
 fn main() {
