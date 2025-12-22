@@ -1,8 +1,11 @@
 use itertools::Itertools;
+use std::cmp::{min, max};
 use std::collections::VecDeque;
-use std::fmt::write;
+use std::fmt::{Display, write};
 use std::fs::File;
 use std::io::Read;
+use std::ops::Range;
+use std::usize;
 
 fn read_input() -> String {
     let mut contents = String::new();
@@ -190,32 +193,6 @@ fn fast_route(buttons: Vec<Vec<usize>>, answer: Vec<u32>) -> u32 {
     0
 }
 
-fn solve_problem_2(problem: &Problem) -> u64 {
-    let mut presses = 0;
-    let Problem {
-        lights: _,
-        buttons,
-        batteries,
-    } = problem;
-
-    let min_len = batteries.iter().max();
-    let multisets_iterator = multisets(buttons.len(), min_len, 150);
-    for route in multisets_iterator {
-        let mut state = vec![0; batteries.len()];
-        let route_len = route.len();
-        for button_index in &route {
-            add_state(&mut state, &buttons[*button_index]);
-        }
-        println!("Applied {:?} and state is now {:?}", route, state);
-        if state.eq(batteries) {
-            presses = route_len;
-            break;
-        };
-    }
-
-    presses as u64
-}
-
 fn part_1(input: &str) -> u64 {
     let problems = parse(&input);
 
@@ -231,11 +208,6 @@ fn part_2(input: &str) -> u64 {
     let problems = parse(&input);
 
     let mut sum = 0;
-    for (i, problem) in problems.iter().enumerate() {
-        sum += solve_problem_2(&problem);
-
-        println!("Solved {}/{}", i, problems.len())
-    }
 
     sum
 }
@@ -246,6 +218,97 @@ fn main() {
 
     let part_2_answer = part_2(&input);
     println!("Part 2 Solution {}", part_2_answer);
+}
+
+#[derive(Clone)]
+struct Matrix {
+    values: Vec<u32>,
+    size: (usize, usize),
+}
+
+impl Matrix {
+    fn new(values_to_insert: Vec<Vec<usize>>) -> Matrix {
+        let num_cols = values_to_insert.iter().flatten().max().unwrap() + 1;
+        let num_rows = values_to_insert.len();
+
+        let mut values = vec![0; num_rows * num_cols];
+
+        for (i, value_column) in values_to_insert.iter().enumerate() {
+            for index in value_column {
+                values[i * num_cols + index] = 1;
+            }
+        }
+
+        Matrix {
+            values: values,
+            size: (num_rows, num_cols),
+        }
+    }
+
+    fn get_row_range(self: &Self, row_index: usize) -> Range<usize> {
+        (row_index * self.size.1)..((row_index + 1) * self.size.1)
+    }
+
+    fn get_row(self: &Self, row_index: usize) -> &[u32] {
+        return &self.values[self.get_row_range(row_index)];
+    }
+
+    fn get_column(self: &Self, column_index: usize) -> Vec<u32> {
+        return self
+            .values
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| (i % self.size.1) == column_index)
+            .map(|(_, &value)| value)
+            .collect();
+    }
+
+    fn swap_rows(self: &mut Self, row_a_index: usize, row_b_index: usize) {
+
+        if row_a_index == row_b_index {return;}
+
+        let row_1_index = min(row_a_index, row_b_index);
+        let row_2_index = max(row_a_index, row_b_index);
+
+        let row_2 = self.get_row(row_2_index).to_vec();
+
+        let (values_up_to_row_2, row_2_and_on)  = self.values.split_at_mut(row_2_index*self.size.1);
+
+
+    }
+
+    fn write_row(self: &mut Self, row_index: usize, row: &[u32]) {
+        let range = self.get_row_range(row_index);
+        self.values[range].copy_from_slice(row);
+    }
+
+}
+
+impl Display for Matrix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut display = String::new();
+        for row_index in 0..self.size.0 {
+            for col_index in 0..self.size.1 {
+                display.push_str(&self.values[(row_index * self.size.1) + col_index].to_string());
+            }
+            display.push('\n');
+        }
+        f.write_str(&display)
+    }
+}
+
+fn gaussian_elimination(matrix: &Matrix, b: Vec<u32>) -> () {
+    let mut index = 0;
+    let min_matrix_size = min(matrix.size.0, matrix.size.1);
+    while index < min(matrix.size.0, matrix.size.1) {
+        // find a row that matches the specifications well (has a 1, nonzero values for rest
+        // (ideally))
+        let mut selected_row = 
+        for row_index in (index..matrix.size.0) {
+            let row = matrix.get_row(row_index);
+            if row
+        }
+    }
 }
 
 #[cfg(test)]
@@ -294,5 +357,21 @@ mod tests {
         let answer = vec![false, false, true, true, false, false, true];
 
         assert_eq!(get_lights(test_example), answer);
+    }
+
+    #[test]
+    fn print_matricies() {
+        let input = read_input();
+
+        let mut vec_buttons = Vec::new();
+        for line in input.lines() {
+            let buttons = get_buttons(line);
+            vec_buttons.push(buttons);
+        }
+
+        for button_vec in vec_buttons {
+            let matrix = Matrix::new(button_vec);
+            println!("{}", matrix)
+        }
     }
 }
